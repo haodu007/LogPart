@@ -1,0 +1,16 @@
+K := x, [t1, t2], [1/x, 1/(x*t1)]; 
+Data := []; deg := 12; k := 5; p1 := 3*z^2+z-1; p2 := z^2+1; 
+for i to deg do 
+     data := [];
+     for j to k do 
+         f := randpoly([x, t1, t2], dense, degree = i)*(1/randpoly([x, t1, t2], dense, degree = i)); 
+         g1 := randpoly([y, x, t1, t2], degree = floor(i/2+1));
+         h1 := evala(Simplify(sum(y*DField:-Derivative(K, g1)/g1, y = RootOf(p1 = 0)))); 
+         g2 := randpoly([y, x, t1], degree = ceil(i/2+1));
+         h2 := evala(Simplify(sum(y*DField:-Derivative(K, g2)/g2, y = RootOf(p2 = 0)))); 
+         s := normal(DField:-Derivative(K, 1/f)+h1+h2); 
+         data := [op(data), s];
+      end do; 
+      Data := [op(Data), data]; 
+end do:
+save K, Data, Data5;

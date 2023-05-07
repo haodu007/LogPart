@@ -1,0 +1,551 @@
+###########################################################################
+#
+# Module:  Reduction							   
+# 						   
+# The module includes algorithms in Jing Guo's thesis.                                     					   
+###########################################################################
+
+Reduction := module ()
+  option package;
+  description "algorithms for reductions";
+  export 
+     CanonicalForm,
+     KernelReduction,
+     KernelAndShellReduction, 
+     HermiteReduce,  
+     HermiteReduce1,     
+     Indicator,
+     ShellReduction,
+     SIntegrable;    
+  local
+     KernelReduction1,
+     RelativeFactor,
+     ShellReduction1;
+
+ #########################################################################################################
+ # Name: HermiteReduce1
+ # Calling sequence: HermiteReduce1(x, T, dT, f)
+ # Input:   x,   a variable of the base field C(x);
+ #          T = [t1, t2, .., tn],   a list of generators of a monomial tower K_n over C(x), maybe empty;
+ #          dT = [t1', t2', .., tn'],   a list of derivatives of elements in T, maybe empty;
+ #          f,   a rational function in multivariate differential field C(x)(T) with a normal denominator.
+ # Output:  [g, h, p] 
+ #          such that f = g' + h + p,
+ #          where g, h are in K_n and h is t_n -simple, p is in K_{n-1}[t_n], if T <> [];
+ #                g, h are in C(x) and h is x-simple, p = 0, if T = [].
+ #########################################################################################################
+
+HermiteReduce1 := proc(x, T, dT, f)
+     local ff, y, a, d, P, L, Q, m, g, s, p, p1, i;
+
+     # find the main "variable"
+
+     if T = [] then
+         y := x;
+     else
+         y := op(-1, T);
+     end if;
+
+    # compute the proper and polynomial parts with the monic denominator
+  
+    ff := normal(f);
+    d := denom(ff);
+    #l := lcoeff(d, y);
+    a := rem(numer(ff), d, y, 'p1');
+    #d := normal(d/l);
+    #a := normal(a/l);
+
+   # trivial case
+    
+    if a = 0 then
+       if nops(T) = 0 then
+          return [int(p1, x), 0, 0];
+       end if ;
+       return [0,  0,  p1];
+    end if;
+
+   # partial fraction decomposition
+
+    P := convert(a/d, parfrac, y, sqrfree);
+    if  op(0, P) <> `+` then
+        L := HermiteReduce(x, T, dT, a/d);
+        if nops(T) = 0 then
+           return [normal(L[1]+int(p1,x)), L[2], L[3]];
+        end if; 
+        return [L[1], L[2], normal(L[3]+p1)];
+    end if;
+
+   # Hermite reduce fraction-wise
+
+    Q := [op(P)];
+    m := nops(Q);
+    g := 0;  s := 0;  p := p1; 
+    for i from 1 to m do
+         L := HermiteReduce(x, T, dT, Q[i]); 
+         g := normal(g+L[1]);
+         s  := normal(s+L[2]);
+         p := normal(p+L[3]);
+     end do:
+
+    # Prepare for return
+
+    if  T = [] then
+        g := normal(g + int(p, y));
+         return [g, s, 0];
+    end if;
+    return [g, s, p];
+
+end proc:
+
+    
+   
+
+    
+ #########################################################################################################
+ # Name: HermiteReduce
+ # Calling sequence: HermiteReduce(x, T, dT, f)
+ # Input:   x,   a variable of the base field C(x);
+ #          T = [t1, t2, .., tn],   a list of generators of a monomial tower K_n over C(x), maybe empty;
+ #          dT = [t1', t2', .., tn'],   a list of derivatives of elements in T, maybe empty;
+ #          f,   a rational function in multivariate differential field C(x)(T) with a normal denominator.
+ # Output:  [g, h, p] 
+ #          such that f = g' + h + p,
+ #          where g, h are in K_n and h is t_n -simple, p is in K_{n-1}[t_n], if T <> [];
+ #                g, h are in C(x) and h is x-simple, p = 0, if T = [].
+ #########################################################################################################
+
+ HermiteReduce := proc(x, T, dT, f)
+     local ff, y, d, l, d1, p1, p2, m, a, p, g, i, j, u, v, B, h, Timing;
+
+     # find the main "variable"
+
+     if T = [] then
+         y := x;
+     else
+         y := op(-1, T);
+     end if;
+
+    # compute the proper and polynomial parts with the monic denominator
+  
+    ff := normal(f);
+    d := denom(ff);
+    l := lcoeff(d, y);
+    a := rem(numer(ff), d, y, 'p1');
+    d := normal(d/l);
+    a := normal(a/l);
+
+    # square-free decomposition
+
+    d1 := sqrfree(d, y)[2];
+#print(squarefree, d1);
+
+    # Hermite Reduction
+
+    g := 0;
+    for i from 1 to nops(d1) do
+        (v, m) := d1[i][1], d1[i][2];
+        u := normal(d/v^m);
+
+        for j from m - 1 by -1 to 1 do
+#print(EEAstart);
+#Timing:=time():
+            # use EEA
+            B := Rational:-EEA(y, -a/j, [u, DField:-Derivative(x, T, dT, v)], v);
+            # use ExtendedEuclidean
+            #B := Rational:-ExtendedEuclidean(y, -a/j, u*DField:-Derivative(x, T, dT, v), v);
+#print(EEAend, time()-Timing);
+            g := g + B[1]/v^j;
+            a := normal(-j*B[2] - u*DField:-Derivative(x, T, dT, B[1]));
+        end do;
+        d := normal(u*v);
+    end do;
+
+    a := rem(a, d, y, 'p2');
+    p := normal(p1 + p2);
+    h := normal(a/d);
+
+    if T = [] then
+        g := g + int(p, x);
+        p := 0;
+    end if;
+
+    return [g, h, p];
+end proc:
+
+
+
+#########################################################
+# Name: Indicator
+# Calling Sequence：Indicator(T, M)
+# Input:  T, a list of indeterminates in ascending order;
+#         M, a monomial in T.
+# Output: i, the indicator of M.
+#########################################################
+
+Indicator  :=  proc(T, M)
+    local i, n, ind;
+    n := nops(T);
+    if depends(M, T) then
+        for i from 1 to n do 
+            if depends(M, T[i]) then 
+                return i;
+            end if;
+        end do;
+    else 
+        return n;
+    end if;
+end proc:
+
+
+
+
+################################################################################
+# Name: SIntegrable
+# Calling sequence: SIntegrable(x, T, A, f, ind)
+# Input: x, a variable; 
+#           T, a list of indeterminates;
+#           A, the associated matrix of the differential field generated by T;
+#           f,  an element in the differential field generated by T in Matryoshka form;
+#           ind, an integer between 0 and ind;
+# Ouput:  C := [c_1, ..., c_[ind]] such that
+#                     (1)  c_1, ..., c_[ind] are constant, not all  zero;
+#                     (2)  f = c_1*T[1]' + ... + c_[ind]*T[ind]';
+#             [], if no such constants exist.
+################################################################################
+
+SIntegrable := proc(x, T, A, f, ind)
+   local S, Y, Z, X,  i,  L,  j,  M,  Tp, p, u; 
+      S := {};  Y := [];  Tp := [x, op(T)]; 
+      for i from 1 to ind do
+            Y  := [op(Y), X[i]]; 
+            L  := 0; 
+            for j from 1 to ind do
+                 L := L + A[i,j]*X[j];
+            end do;
+            L := L - f[i];
+            S := S union {coeffs(collect(numer(L), Tp, 'distributed'), Tp)};
+      end do;
+      M := SolveTools:-Linear(S, {op(Y)}); 
+      if M = NULL then
+         return [];
+      end if;
+      for i from 1 to ind do
+           u := M[i];
+           member(lhs(u), Y, 'p');
+           Z[p] := rhs(u);
+      end do;
+      return[seq(Z[j], j=1..ind)];
+end proc;
+
+#################################################################################
+#Name: CanonicalForm
+#Calling sequence: CanonicalForm(x, T, dT, f)
+#Input:  x,   a variable of the base field C(x);
+#          T = [t1, t2, .., tn],   a list of generators of a hyperexponential tower K_n over C(x), maybe empty;
+#          dT = [t1', t2', .., tn'],   a list of derivatives of elements in T, maybe empty;
+#          f,   a rational function in multivariate differential field C(x)(T).
+# Output:  [k, s] such that 
+#               f=k+s'/s;
+#      where k is diffrential reduced;
+#      neither num(s) nor den(s) has the factor tn
+#       gcd(den(K), den(S))=1.
+###################################################################################                  
+
+CanonicalForm := proc(x, T, dT, f)
+local t, a, b, F, n, i, m, p, c, q,  r, u,  s, k;
+
+   # find the main "variable" 
+
+     if T = [] then
+        t := x;
+     else
+       t := op(-1, T);
+     end if;
+
+     a := numer(f);
+     b := denom(f);
+     F := factors(primpart(b, t));
+     n := nops(F[2]);
+
+     s := 1;
+     k := f;
+     for i from 1 to n do
+         (p, m) := F[2][i][1], F[2][i][2];
+         if m = 1 then
+            if  t = x or rem(p, t,  t)<> 0 then
+               q := normal(f-c*DField:-Derivative(x,T, dT, p)/p);
+               r := rem(numer(q), p, t);
+               u := normal(-subs(c=0, r)/lcoeff(r, c));
+               if type(u, integer) then
+                  s := normal(s*p^u);
+                  k := normal(k-u*DField:-Derivative(x,T, dT, p)/p);
+               end if;
+            end if;
+         end if;
+      end do;
+
+      return [k, s];
+end proc:
+
+############################################################################### 
+# Name: KernelReduction1
+# Calling sequence:
+#
+#                   KernelReduction1(x, T, dT, p, k1, k2, m)
+#
+# Input:  x,   a variable of the base field C(x);
+#           T = [t1, t2, .., tn],    a list of indeterminates over the base field, maybe [];
+#           dT = [t1', t2', .., tn'],   a list of derivatives of elements in T, maybe [];
+#            p, k1, k2, three polynomials with K := k1/k2 differential-reduced ；
+#             m,         a positive integer.
+# Output: [p1, p2], two polynomials such that
+#              p/k2^m = (p1/k2^(m-1))' + p1/k2^(m-1)*K + p2/k2.
+#####################################################################
+
+KernelReduction1  :=  proc(x, T, dT, p, k1, k2, m)
+   local t, res, p1s, p2s, p1, p2, rds;
+   if T = [] then
+      t := x;
+  else
+     t := op(-1, T);
+  end if;
+  if m = 1 then
+     return([0, p]);
+  end if;
+
+  res := Rational:-ExtendedEuclidean(t, p, k1-(m-1)*DField:-Derivative(x, T, dT ,k2), k2);
+  p1s := res[1];
+  p2s := normal(res[2] - DField:-Derivative(x, T, dT ,res[1]));
+  rds := KernelReduction1(x, T,  dT,  p2s,  k1,  k2,  m-1);
+  p1 := normal(rds[1]*k2+p1s);
+  p2 := rds[2];
+  return [p1, p2];
+
+end proc:
+
+############################################################################ 
+#Name: KernelReduction(x, T, dT, f, k1, k2)
+#Calling sequence:
+#                       KernelReduction(x, T, dT, f, k1, k2)
+#
+#Input:  x,   a variable of the base field C(x);
+#           T = [t1, t2, .., tn],    a list of indeterminates over the base field, maybe [];
+#          dT = [t1', t2', .., tn'],   a list of derivatives of elements in T, maybe [];
+#          f , a rational function w.r.t tn  in C(x)(T) whose denominator is a divisor of some power of k2,
+#          k1, k2 two coprime polynomials in tn such that K := k1/k2 is diffrential reduced;
+#Output: [u, p] such that
+#             f = u'+K*u+p/k2,
+#             where u is a rational fuction, p is a polynomial w.r.t tn .
+###########################################################################
+  
+KernelReduction := proc(x, T, dT, f, k1, k2)
+   local  b, t, l, h, W; 
+
+   #------------------------------------------------------
+   #  Find the main variable
+   #------------------------------------------------------
+ 
+   if T = [] then
+      t := x;
+  else
+     t := op(-1, T);
+  end if;
+
+  b := denom(f);
+
+  #------------------------------------------------------
+  # Find the correct multiplicity of k2
+  #------------------------------------------------------
+
+  l := 1;
+  h := k2;
+  while  rem(h, b, t)<>0 do
+     l  := l+1;
+     h := h*k2;
+  end do;
+
+  #----------------------------------------------------------------
+  # Kernel reduction with multiplicity
+  #----------------------------------------------------------------
+
+  W := KernelReduction1(x, T, dT, normal(h*f), k1, k2, l);
+  return ([normal(W[1]*k2/h), W[2]]);
+
+end proc:  
+
+
+
+##################################################################################### 
+# Name: RelativeFactor
+# Calling sequence:
+#            RelativeFactor(p, q, t)
+# Input:
+#        p, q, two nonzero polynomials in t;
+#        t, a name
+# Output,  [r, s] such that
+#                p = r*s, 
+#                no irreducilbe factors of r are factors of q,
+#                all irreducible factors of s are factors of q;
+################################################################################## 
+
+RelativeFactor := proc(p, q, t)
+         local r, s, g, gs;
+         (r, s) := (p, 1);
+         while true do
+           g := gcd(numer(r), q);
+           if degree(g, t) = 0 then
+              return [r, s];
+          else
+             gs := g/lcoeff(g, t);
+             r := quo(r, gs, t);
+             s  := s*gs;
+          end if;
+        end do;
+end proc: 
+
+################################################################################# 
+#Name: ShellReduction1
+#Calling sequence:
+#                ShellReduction1(x, T, dT, a, d, i, k1, k2)
+#Input : x,   a variable of the base field C(x);
+#          T = [t1, t2, .., tn],   a list of generators of a hyperexponential tower K_n over C(x), may be empty;
+#          dT=[t1', t2', ...,tn']   a list of derivatives of T;
+#          a, d,   elements of K_{n-1}[tn] and d is normal if T <>[],
+#                    elements of C[x] and d is squarefree if T =[] ;
+#          i, an positive integer;
+#          k1, k2,  two polynomials with K:=k1/k2 diffrential reduced and gcd(d, den(K))=1.
+#Output: [p1, p2, p3]such that
+#             a/d^i = (p1)' + p1*K + p2+p3;
+#            where p1, p2, p3 are in C(x)(T)  with p2 =a2/den(K) and p3= a3/d if T <>[],
+#                  p1, p2, p3 are in C(x) with p2 =a2/den(K) and p3= a3/d if T=[].
+############################################################################### 
+
+ShellReduction1:=proc(x, T, dT, a, d, i, k1, k2) 
+    local t, j, p1, p2, p3, M, N; 
+    if T = [] then
+       t :=x;
+    else
+       t := op(-1, T);
+    end if; 
+
+    if i=1 then
+      return [0, 0, a/d];
+    end if; 
+
+    p1 := 0;
+    p2 := 0;
+    p3 := a; 
+
+     for j from i by -1 to 2 do 
+
+       M := Rational:-ExtendedEuclidean(t, p3/(1-j), DField:-Derivative(x, T, dT, d), d );  #a/(1-i)=M[1]d+M[2]d'
+       p1 := normal(p1+M[1]/d^(j-1));
+       N  := Rational:-ExtendedEuclidean(t, -k1*M[1], k2, d^(j-1) );
+       p2 := normal(p2+N[2]/k2);
+       p3 := normal(-DField:-Derivative(x, T, dT, M[1])+(1-j)*M[2]+N[1]); 
+
+     end do; 
+
+    return ([p1, p2, p3/d]);
+
+ end proc: 
+
+################################################################################## 
+
+#Name: ShellReduction
+#Calling sequence:
+#                  ShellReduction(x, T, dT, f, k1, k2)
+#Input : x,   a variable of the base field C(x);
+#          T = [t1, t2, .., tn],   a list of generators of a hyperexponential tower K_n over C(x), may be empty;
+#          dT=[t1', t2', ...,tn']   a list of derivatives of T;
+#          f, a rational function in C(x)(T) whose any irreducible factor p  of den(f) satisfies  gcd(p, k2)=1 and p<>t_n  if T<>[];
+#          f, a rational function in C(x) if T=[];
+#          k1,k2,  K:=k1/k2 is diffrential reduced.
+#Output: [u, h, p]such that
+#             f= u' + u*K + h+p/den(K);
+#             where u is in C(x)(T),  h is t_n-simple and gcd(den(K), den(h))=1, p is in C(x)(t1, ...,t_(n-1))[t_n, t_n^{-1}]  if T<>[];        
+#                        u is in C(x), h is x-simple and gcd(den(K), den(h))=1, p is in C[x] if  T=[].
+
+############################################################################### 
+
+ShellReduction := proc(x, T, dT, f, k1, k2) 
+    local t, a, b, u, p, h, S, j, d, m, M, N; 
+
+     if T = [] then
+       t :=x;
+    else
+       t := op(-1, T);
+    end if; 
+
+    (a, b) :=numer(f), denom(f);
+    u := 0;
+    p := 0;
+    h := 0;
+  
+  #reduce irreducible factors d of den(f]) satisfy gcd(d, k2)=1, 
+
+  S := factors(b);
+  for j from 1 to nops(S[2]) do 
+      (d, m) := S[2][j][1], S[2][j][2];
+      M := Rational:-ExtendedEuclidean(t, a, normal(b/(d^m)), d^m);  #M[1]/d^m + M[2]/(b/d^m) =a/b
+      N := ShellReduction1(x, T, dT, M[1], d, m, k1, k2);
+      u := normal(u+N[1]);
+      p := normal(p+N[2]);
+      h := normal(h+N[3]);
+      b := normal(b/d^m);
+      a := M[2]; 
+  end do;
+  return ([u, h, normal(p*k2)]);
+end proc:
+
+############################################################################################################################ 
+#Name: KernelAndShellReduction
+#Calling sequence:
+#                    KernelAndShellReduction(x, T, dT, f, k1, k2)
+# Input:   x,   a variable of the base field C(x);
+#          T = [t1, t2, .., tn],   a list of generators of a hyperexponential tower K_n over C(x), maybe empty;
+#          dT = [t1', t2', .., tn'],   a list of derivatives of elements in T, maybe empty;
+#          f,   an element in C(x)(T);
+#          k1,k2,  K:=k1/k2 is diffrential reduced.
+# Output:  [u, h,  p]
+#          such that f = u' + K*u + h+p/den(K),
+#          where u is in K_n, p is in C(x)(t1,...,t_{n-1})[tn, tn^{-1}] and h is t_n simple  with gcd(den(h), den(K))=1 if T<>[];
+#                    u is in C(x), p is in C[x] and h is x-simple  with gcd(den(h), den(K))=1 if T=[];
+############################################################################################################################ 
+
+KernelAndShellReduction := proc(x, T, dT, f, k1, k2)
+   local t, F, num, den, W, A, h1, S, R;
+
+   if T = [] then
+     t :=x;
+     F:=[f,0];
+   else
+     t := op(-1, T);
+     F := Rational:-NormallyProperAndLaurentPolynomialParts (f, t);
+   end if;
+
+   
+      if F[1] = 0 then
+         return ( [0, 0 ,normal(k2*F[2]),0] );
+      end if; 
+     (num, den) := numer(F[1]), denom(F[1]);
+     W := RelativeFactor(den, k2, t);
+   if W[1] = [] then
+     return ([0, 0,normal(k2*F[2]), F[1]]);
+  end if;
+
+  A  := Rational:-ExtendedEuclidean(t, num, W[2], W[1]);   #A[1]/W[1]+A[2]/W[2]=F[1]
+  h1 := normal(A[2]/W[2]); 
+
+  S := ShellReduction(x, T, dT, normal(A[1]/W[1]), k1, k2);
+  if h1 = 0 then
+     return (S);
+  end if;
+
+  R := KernelReduction(x, T, dT, h1, k1, k2);
+  return([normal(S[1]+R[1]), S[2], normal(R[2]+S[3]+F[2]*k2)]);
+
+end proc: 
+
+end module:
+
