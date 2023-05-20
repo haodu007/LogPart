@@ -1,3 +1,2 @@
-The experiments and timings of Figure 1,2,3 are given in TestLogPart;
-
-while them of Figure 4,5,6 are given in TestLogInt
+The experimental data of Figures 1,2 and 3 is given in TestLogPart;
+That of Figures 4,5 and 6 is in TestLogInt.
