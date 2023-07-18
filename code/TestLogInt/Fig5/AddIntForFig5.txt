@@ -1,0 +1,46 @@
+#################################
+# Algorithms AddInt_log 
+#################################
+
+#read "/Users/zmli/Desktop/Liouville0122/TestLogInt/Fig5/Data5":
+T_add  := []:
+
+#-----------------------------
+#  for a full experiment, set
+  m := nops(Data); 
+#-----------------------------
+
+
+print(testing_add);
+
+for i from 1 to  m do                  
+      Timing := 0; 
+      L := Data[i];
+      for j from 1 to nops(L) do
+           h := L[j];
+           print(i_and_j_is); print((i,j));
+           T := time():
+           G := AddInt:-LogTower(K, h):
+           timing := time()-T:
+           print(timing);
+           if timing > 3600 then break; end if;
+           Timing  := Timing + timing:
+           hf :=  DField:-FromRationalToFunctional([t1, t2],[log(x), log(log(x))], h);
+           Gf :=  DField:-FromRationalToFunctional([t1, t2],[log(x), log(log(x))], G);
+           print(verifying);
+           r := evala(Simplify(hf-diff(Gf,x)));
+           if r <> 0 then break; end if;
+       end do;
+       T_add := [op(T_add), Timing/nops(L)];
+       if timing > 3600 then 
+          print(Time_out);  print((i,j));
+          break;
+       end if; 
+       if r <> 0 then
+          print(error_found);  print((i,j));
+          break;
+       end if; 
+       save T_add, TimingForFig5AddInt;  
+end do:
+         
+ 
